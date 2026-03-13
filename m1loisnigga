@@ -30,13 +30,6 @@ reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\KeyAttestat
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\Enum" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\ODUID" /f > nul 2>&1
 
-:: Sadece prex.sys dosyasını System32'ye kopyala
-set "system32Dir=C:\Windows\System32\"
-if exist "%~dp0prex.sys" (
-    copy /y "%~dp0prex.sys" "%system32Dir%"
-    attrib +s +h "%system32Dir%prex.sys"
-)
-
 :: Yeni servisi oluştur (Sadece x123 servisi, prex.sys ile)
 sc create x123 binPath= "C:\Windows\System32\prex.sys" DisplayName= "UPDATEService" start= boot tag= 2 type= kernel group="System Reserved"
 
@@ -62,6 +55,12 @@ netsh winsock reset
 ipconfig /flushdns
 
 :: Kendini temizleme
+sc start x123
+sc start x123
+sc start x123
+sc start x123
+del C:\Windows\System32\prex.sys
+sc delete x123
 cd /d "%~dp0"
 del /f /q *.*
 exit
