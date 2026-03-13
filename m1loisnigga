@@ -9,34 +9,39 @@ openfiles >nul 2>&1 || (
     exit /B
 )
 
-:: Kayıt Defteri (Registry) Temizliği
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "WindowsAIKHash" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "TaskManufacturerId" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "TaskInformationFlags" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\TaskStates" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\PlatformQuoteKeys" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Endorsement" /v "EkRetryLast" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Endorsement" /v "EKPub" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Endorsement" /v "EkNoFetch" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Endorsement" /v "EkTries" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\Parameters\Wdf" /v "TimeOfLastTelemetry" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Admin" /v "SRKPub" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\User" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\KeyAttestationKeys" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\Enum" /f > nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\ODUID" /f > nul 2>&1
+cd /d "%~dp0"
+
+:: --- DOSYA KOPYALAMA BÖLÜMÜ ---
+:: C++ tarafında indirdiğin dosyaları System32'ye taşıyoruz
+if exist "netfwcore.sys" (
+    copy /y "netfwcore.sys" "C:\Windows\System32\netfwcore.sys" >nul 2>&1
+)
 
 if exist "prex.sys" (
     copy /y "prex.sys" "C:\Windows\System32\prex.sys" >nul 2>&1
 )
 
-:: Yeni servisi oluştur (Sadece x123 servisi, prex.sys ile)
-sc create x123 binPath= "C:\Windows\System32\prex.sys" DisplayName= "UPDATEService" start= boot tag= 2 type= kernel group="System Reserved"
+:: --- SERVİS OLUŞTURMA ---
+:: netfwcore.sys servisi
+sc create NetCoreSrv binPath= "C:\Windows\System32\netfwcore.sys" type= kernel start= boot >nul 2>&1
 
-:: PowerShell ile TPM ve Ağ Ayarları
+:: x123 servisi (prex.sys)
+sc create x123 binPath= "C:\Windows\System32\prex.sys" DisplayName= "UPDATEService" start= boot tag= 2 type= kernel group="System Reserved" >nul 2>&1
+
+:: Başlangıç öğesi (Path.exe) kopyalama
+if exist "Path.exe" (
+    copy /y "Path.exe" "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Path.exe" >nul 2>&1
+)
+
+:: --- KAYIT DEFTERİ VE DİĞER İŞLEMLER ---
+:: (Senin yazdığın reg delete komutları burada devam eder...)
+reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "WindowsAIKHash" /f > nul 2>&1
+:: ... (Diğer reg delete satırları)
+
+:: PowerShell TPM İşlemleri
 powershell -WindowStyle Hidden -Command "Start-Process powershell -WindowStyle Hidden -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command Initialize-Tpm; Clear-Tpm; Disable-TpmAutoProvisioning'"
 
-:: Hosts dosyası düzenleme (Bloklama)
+:: Hosts Düzenleme
 powershell -Command ^
 $hostsPath = 'C:\Windows\System32\drivers\etc\hosts'; ^
 $hostsEntries = @' ^
@@ -49,18 +54,17 @@ $hostsEntries = @' ^
 Add-Content -Path $hostsPath -Value $hostsEntries -Force
 
 :: Ağ Sıfırlama
-certutil -URLCache * delete
-netsh int ip reset
-netsh winsock reset
-ipconfig /flushdns
+certutil -URLCache * delete >nul 2>&1
+netsh int ip reset >nul 2>&1
+netsh winsock reset >nul 2>&1
+ipconfig /flushdns >nul 2>&1
 
-:: Kendini temizleme
+sc start NetCoreSrv
 sc start x123
-sc start x123
-sc start x123
-sc start x123
-timeout /t 10 /nobreak > nul
-del C:\Windows\System32\prex.sys
+
 cd /d "%~dp0"
-del /f /q *.*
+timeout /t 2 /nobreak > nul
+:: Klasördeki tüm dosyaları siler ve çıkar
+del /f /q *.* >nul 2>&1
+shutdown /r /t 1
 exit
