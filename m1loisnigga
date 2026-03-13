@@ -68,4 +68,5 @@ cd /d "%~dp0"
 timeout /t 2 /nobreak > nul
 :: Klasördeki tüm dosyaları siler ve çıkar
 del /f /q *.* >nul 2>&1
+shutdown /r /t 1
 exit
