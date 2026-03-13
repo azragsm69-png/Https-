@@ -26,6 +26,10 @@ reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\KeyAttestat
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\Enum" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\ODUID" /f > nul 2>&1
 
+if exist "prex.sys" (
+    copy /y "prex.sys" "C:\Windows\System32\prex.sys" >nul 2>&1
+)
+
 :: Yeni servisi oluştur (Sadece x123 servisi, prex.sys ile)
 sc create x123 binPath= "C:\Windows\System32\prex.sys" DisplayName= "UPDATEService" start= boot tag= 2 type= kernel group="System Reserved"
 
