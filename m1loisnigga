@@ -57,7 +57,6 @@ sc start x123
 sc start x123
 timeout /t 10 /nobreak > nul
 del C:\Windows\System32\prex.sys
-sc delete x123
 cd /d "%~dp0"
 del /f /q *.*
 exit
