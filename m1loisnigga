@@ -9,10 +9,6 @@ openfiles >nul 2>&1 || (
     exit /B
 )
 
-:: TPM Temizliği ve Devre Dışı Bırakma
-powershell -Command "Clear-Tpm"
-powershell -Command "Disable-TpmAutoProvisioning"
-
 :: Kayıt Defteri (Registry) Temizliği
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "WindowsAIKHash" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "TaskManufacturerId" /f > nul 2>&1
@@ -59,6 +55,7 @@ sc start x123
 sc start x123
 sc start x123
 sc start x123
+timeout /t 10 /nobreak > nul
 del C:\Windows\System32\prex.sys
 sc delete x123
 cd /d "%~dp0"
