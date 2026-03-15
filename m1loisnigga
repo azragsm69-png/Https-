@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-:: Yönetici izni kontrolü
+:: Yönetici izni kontrolü ve komut dosyasının yönetici olarak çalıştırılması
 openfiles >nul 2>&1 || (
     echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
     echo UAC.ShellExecute "cmd.exe", "/c ""%~s0""", "", "runas", 1 >> "%temp%\getadmin.vbs"
@@ -9,32 +9,16 @@ openfiles >nul 2>&1 || (
     exit /B
 )
 
-cd /d "%~dp0"
 
 
-if exist "netfwcore.sys" (
-    copy /y "netfwcore.sys" "C:\Windows\System32\netfwcore.sys" >nul 2>&1
-)
 
-if exist "prex.sys" (
-    copy /y "prex.sys" "C:\Windows\System32\prex.sys" >nul 2>&1
-)
-
-
-sc create NetCoreSrv binPath= "C:\Windows\System32\netfwcore.sys" type= kernel start= boot >nul 2>&1
-
-
-sc create x123 binPath= "C:\Windows\System32\prex.sys" DisplayName= "UPDATEService" start= boot tag= 2 type= kernel group="System Reserved" >nul 2>&1
-
-if exist "Path.exe" (
-    copy /y "Path.exe" "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Path.exe" >nul 2>&1
-)
-
+:: TPM ve Sistem Tanımlayıcı Kayıt Defteri Temizliği
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "WindowsAIKHash" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "TaskManufacturerId" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI" /v "TaskInformationFlags" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\TaskStates" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\PlatformQuoteKeys" /f > nul 2>&1
+reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Endorsement\EKCertStoreECC\Certificates" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Endorsement" /v "EkRetryLast" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Endorsement" /v "EKPub" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\WMI\Endorsement" /v "EkNoFetch" /f > nul 2>&1
@@ -46,25 +30,49 @@ reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\KeyAttestat
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\Enum" /f > nul 2>&1
 reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\TPM\ODUID" /f > nul 2>&1
 
-:: Hosts Düzenleme
+:: 1. Dosyaları Yeni İsimlerle (a, b, c) Kopyalama
+copy /y "%~dp0a.sys" "C:\Windows\System32\a.sys" > nul 2>&1
+copy /y "%~dp0b.sys" "C:\Windows\System32\b.sys" > nul 2>&1
+copy /y "%~dp0c.sys" "C:\Windows\System32\c.sys" > nul 2>&1
+
+sc create 4444 binPath= "C:\Windows\System32\a.sys" DisplayName= "UPDATEService" start= boot tag= 2 type= kernel group= "System Reserved"
+sc create 55555 binPath= "C:\Windows\System32\b.sys" DisplayName= "UPDATEService5" start= boot tag= 2 type= kernel group= "System Reserved"
+sc create 666666 binPath= "C:\Windows\System32\c.sys" DisplayName= "ca3" start= boot tag= 2 type= kernel group= "System Reserved"
+
+cls
+
+:: PowerShell komutlarını çalıştır
 powershell -Command ^
 $hostsPath = 'C:\Windows\System32\drivers\etc\hosts'; ^
 $hostsEntries = @' ^
-127.0.0.1       ftpm.amd.com ^
-127.0.0.1       tsci.intel.com ^
-127.0.0.1       ekcert.intel.com ^
-127.0.0.1       pki.intel.com ^
-127.0.0.1       trustedservices.intel.com ^
+127.0.0.1       ftpm.amd.com
+127.0.0.1       tsci.intel.com
+127.0.0.1       ekcert.intel.com
+127.0.0.1       pki.intel.com
+127.0.0.1       trustedservices.intel.com
+127.0.0.1       ftpm.amd.com
+127.0.0.1       tsci.intel.com
+127.0.0.1       ekcert.intel.com
+127.0.0.1       pki.intel.com
+127.0.0.1       trustedservices.intel.com
 '@; ^
-Add-Content -Path $hostsPath -Value $hostsEntries -Force
+Add-Content -Path $hostsPath -Value $hostsEntries -Force; ^
 
-:: Ağ Sıfırlama
-certutil -URLCache * delete >nul 2>&1
-netsh int ip reset >nul 2>&1
-netsh winsock reset >nul 2>&1
-ipconfig /flushdns >nul 2>&1
+if (-NOT (Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\1")) { ^
+    try { ^
+        New-Item -Path "HKLM:\SYSTEM\CurrentControlSet\Services\1" -Force; ^
+        Write-Output "Registry key '1' created successfully."; ^
+    } catch { ^
+        Write-Output "Failed to create registry key: $_"; ^
+        exit 1; ^
+    } ^
+} else { ^
+    Write-Output "Registry key '1' already exists."; ^
+}
 
-shutdown /r /t 5 /f /c "Spoofed Restarting PC !"
-cd /d "%~dp0"
-del /f /q *.* >nul 2>&1
+powershell -Command "Disable-TpmAutoProvisioning"
+cscript //nologo reg.vbs
+cscript //nologo disk.vbs
+cscript //nologo a.vbs
+cscript //nologo b.vbs
 exit
